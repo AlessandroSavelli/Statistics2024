@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Penetration Simulation</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+        .container {
+            display: flex;
+        }
+        .canvas-wrapper {
+            margin: 20px;
+        }
+        #attackCanvas,
+        #histogramCanvas {
+            background-color: #2C2C2C; /* Dark gray background for both canvases */
+        }
+        body {
+            background-color: #1C1C1C;
+            color: white;
+        }
+        input {
+            margin: 5px;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Server Penetration Simulation</h1>
+    <div>
+        <label for="numServers">Number of Servers (n):</label>
+        <input type="number" id="numServers" value="10" min="1" max="40">
+        <label for="numAttackers">Number of Attackers (m):</label>
+        <input type="number" id="numAttackers" value="5" min="1" max="40">
+        <label for="penetrationProb">Penetration Probability (p):</label>
+        <input type="number" id="penetrationProb" value="0.3" step="0.01" min="0" max="1">
+        <button onclick="simulateAttack()">Run Simulation</button>
+    </div>
+    <div class="container">
+        <div class="canvas-wrapper">
+            <canvas id="attackCanvas" width="800" height="600"></canvas>
+            <p>Attack Process</p>
+        </div>
+        <div class="canvas-wrapper">
+            <canvas id="histogramCanvas" width="800" height="600"></canvas>
+            <p>Penetration Histogram</p>
+        </div>
+    </div>
+    <p>Average Penetrations: <span id="averageScore">0.00</span></p>
+
+    <script>
+        let n = 10; // Number of servers
+        let m = 5;  // Number of attackers
+        let p = 0.3; // Probability of a successful penetration
+
+        const attackCanvas = document.getElementById('attackCanvas');
+        const attackCtx = attackCanvas.getContext('2d');
+        const histogramCanvas = document.getElementById('histogramCanvas');
+        const histogramCtx = histogramCanvas.getContext('2d');
+
+        const widthPerServer = (attackCanvas.width - 100) / 40; // Width per server
+        const heightPerStep = (attackCanvas.height - 100) / 40; // Height per attempt
+        const margin = 50; // Margin for the graph
+
+        let totalPenetrations = 0; // Total count of penetrations
+        let successCountPerServer = Array(n).fill(0); // Count of penetrations for each server
+
+        function drawAttackAxes() {
+            attackCtx.strokeStyle = 'white';
+            attackCtx.lineWidth = 1;
+
+            // X axis (Servers)
+            attackCtx.beginPath();
+            attackCtx.moveTo(margin, margin);
+            attackCtx.lineTo(margin, attackCanvas.height - margin);
+            attackCtx.stroke();
+
+            // Y axis (Attackers)
+            attackCtx.beginPath();
+            attackCtx.moveTo(margin, attackCanvas.height - margin);
+            attackCtx.lineTo(attackCanvas.width - margin, attackCanvas.height - margin);
+            attackCtx.stroke();
+
+            for (let i = 1; i <= n; i++) {
+                attackCtx.beginPath();
+                attackCtx.moveTo(margin + i * widthPerServer, margin);
+                attackCtx.lineTo(margin + i * widthPerServer, attackCanvas.height - margin);
+                attackCtx.strokeStyle = 'gray';
+                attackCtx.stroke();
+            }
+
+            for (let i = 1; i <= m; i++) {
+                attackCtx.beginPath();
+                attackCtx.moveTo(margin, attackCanvas.height - margin - i * heightPerStep);
+                attackCtx.lineTo(attackCanvas.width - margin, attackCanvas.height - margin - i * heightPerStep);
+                attackCtx.strokeStyle = 'gray';
+                attackCtx.stroke();
+            }
+        }
+
+        function drawHistogramAxes() {
+            histogramCtx.beginPath();
+            histogramCtx.moveTo(margin, margin);
+            histogramCtx.lineTo(margin, histogramCanvas.height - margin);
+            histogramCtx.strokeStyle = 'black';
+            histogramCtx.stroke();
+
+            histogramCtx.beginPath();
+            histogramCtx.moveTo(margin, histogramCanvas.height - margin);
+            histogramCtx.lineTo(histogramCanvas.width - margin, histogramCanvas.height - margin);
+            histogramCtx.strokeStyle = 'black';
+            histogramCtx.stroke();
+        }
+
+        function simulateAttack() {
+            n = parseInt(document.getElementById('numServers').value);
+            m = parseInt(document.getElementById('numAttackers').value);
+            p = parseFloat(document.getElementById('penetrationProb').value);
+
+            attackCtx.clearRect(0, 0, attackCanvas.width, attackCanvas.height);
+            histogramCtx.clearRect(0, 0, histogramCanvas.width, histogramCanvas.height);
+            drawAttackAxes();
+            totalPenetrations = 0;
+            successCountPerServer = Array(n).fill(0);
+
+            for (let i = 0; i < m; i++) {
+                let x = margin; 
+                let y = attackCanvas.height - margin - i * heightPerStep;
+                let color = getRandomColor();
+                let levelReached = 0;
+
+                for (let j = 0; j < n; j++) {
+                    let result = Math.random();
+                    let nextX = x + widthPerServer;
+
+                    if (result < p) {
+                        let nextY = y - heightPerStep;
+                        attackCtx.beginPath();
+                        attackCtx.moveTo(x, y);
+                        attackCtx.lineTo(x, nextY);
+                        attackCtx.lineTo(nextX, nextY);
+                        attackCtx.strokeStyle = color;
+                        attackCtx.lineWidth = 3;
+                        attackCtx.stroke();
+                        y = nextY;
+                        successCountPerServer[j]++;
+                        levelReached++;
+                    } else {
+                        attackCtx.beginPath();
+                        attackCtx.moveTo(x, y);
+                        attackCtx.lineTo(nextX, y);
+                        attackCtx.strokeStyle = color;
+                        attackCtx.lineWidth = 3;
+                        attackCtx.stroke();
+                    }
+                    x = nextX;
+                }
+                totalPenetrations += levelReached;
+            }
+
+            drawHistogram();
+            updateAverage();
+        }
+
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        function drawHistogram() {
+            drawHistogramAxes();
+
+            const barWidth = (histogramCanvas.width - 2 * margin) / n;
+            const maxSuccess = Math.max(...successCountPerServer);
+
+            for (let i = 0; i < n; i++) {
+                const height = (successCountPerServer[i] / maxSuccess) * (histogramCanvas.height - 2 * margin);
+                const x = margin + i * barWidth;
+                const y = histogramCanvas.height - margin - height;
+
+                histogramCtx.fillStyle = 'blue';
+                histogramCtx.fillRect(x, y, barWidth - 2, height);
+                histogramCtx.fillStyle = 'white';
+                histogramCtx.fillText(successCountPerServer[i], x + barWidth / 4, y - 5);
+            }
+        }
+
+        function updateAverage() {
+            const averagePenetrations = (totalPenetrations / m).toFixed(2);
+            document.getElementById('averageScore').innerText = averagePenetrations;
+        }
+
+        window.onload = function() {
+            simulateAttack();
+        };
+    </script>
+</body>
+</html>
